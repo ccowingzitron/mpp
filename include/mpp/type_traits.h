@@ -29,7 +29,7 @@
 #include <algorithm>
 #include <complex>
 
-namespace mpi {
+namespace mpp {
 
 //*****************************************************************************
 // 									MPI Type Traits
@@ -48,8 +48,8 @@ struct mpi_type_traits {
 
 };
 
-/** 
- * Specialization of the mpi_type_traits for primitive types 
+/**
+ * Specialization of the mpi_type_traits for primitive types
  */
 #define PRIMITIVE(Type, MpiType) \
 	template<> \
@@ -78,13 +78,13 @@ PRIMITIVE(std::complex<float>,		MPI::COMPLEX);
 PRIMITIVE(std::complex<double>,		MPI::DOUBLE_COMPLEX);
 PRIMITIVE(std::complex<long double>,	MPI::LONG_DOUBLE_COMPLEX);
 
-#undef PRIMITIVE 
+#undef PRIMITIVE
 
 // ... add missing types here ...
 
 template <class T>
 struct mpi_type_traits<const T> {
-	
+
 	typedef const typename mpi_type_traits<T>::element_type element_type;
 	typedef const typename mpi_type_traits<T>::element_addr_type element_addr_type;
 
@@ -107,7 +107,7 @@ struct mpi_type_traits<const T> {
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 template <class T>
 struct mpi_type_traits<std::vector<T>> {
-	
+
 	typedef T element_type;
 	typedef T* element_addr_type;
 
@@ -196,5 +196,5 @@ struct mpi_type_traits<std::list<T>> {
 
 };
 
-} // end mpi namespace 
+} // end mpi namespace
 

@@ -20,13 +20,13 @@
  *
  ******************************************************************************/
 
-#pragma once 
+#pragma once
 
-#include "detail/decls.h"
+#include "mpp/decls.h"
 
-#include "detail/status.h"
+#include "mpp/status.h"
 
-namespace mpi {
+namespace mpp {
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // request<T> is an implementation of the future concept used for asynchronous
@@ -37,16 +37,16 @@ class request{
 	const comm&     			m_comm;
 	MPI_Request 				m_req;
 	msg_impl<T>					m_msg;
-	std::unique_ptr<status> 	m_status;
+	std::shared_ptr<status> 	m_status; // converted to shared_ptr to allow safer checking in the face of errors
 	int 		 				done;
 
 public:
 	request(const comm& com, MPI_Request req, msg_impl<T>&& msg):
 		m_comm(com), m_req(req), m_msg(std::move(msg)), done(0) { }
 
-	request(request<T>&& other) : 
-		m_comm( std::move(other.m_comm) ), 
-		m_req( std::move(other.m_req) ), 
+	request(request<T>&& other) :
+		m_comm( std::move(other.m_comm) ),
+		m_req( std::move(other.m_req) ),
 		m_msg( std::move(other.m_msg) ),
 		m_status( std::move(other.m_status) ),
 		done(other.done) { }
@@ -64,12 +64,13 @@ public:
 		return m_msg.get();
 	}
 
-	inline status getStatus() {
-		if( isDone() ) { return *m_status; }
-		throw "not done";
+	// modified to tolerate whether m_status as been defined or not, and return a pointer to it if true, 0 if false, CACZ 14-4-18
+	inline const std::shared_ptr<status> & getStatus() const {
+		return m_status;
 	}
 
-	inline bool isDone() {
+	// renamed test to emphasize call to MPI_Test for either send or receive completion, CACZ 14-4-18
+	inline bool test() {
 		if ( !done ) {
 			status::mpi_status_ptr stat(new MPI_Status);
 			MPI_Test(&m_req, &done, stat.get());
@@ -79,6 +80,7 @@ public:
 		}
 		return done;
 	}
+
 };
 
-} // end mpi namespace 
+} // end mpi namespace

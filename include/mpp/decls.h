@@ -20,22 +20,39 @@
  *
  ******************************************************************************/
 
-#pragma once 
+#pragma once
 
 #include <mpi.h>
 
 #include <stdexcept>
 
-/** 
+// the following five headers were included to ensure correct compilation, by CACZ 14-4-16
+#include <cassert>
+#include <iostream>
+#include <sstream>
+#include <fstream>
+#include <memory>
+
+/**
  * Contains the forward declaration of the base classes utilized by MPP
  */
 
-namespace mpi {
+namespace mpp {
+
+
+// undefined added, and pair of const ints moved to decls.h to make them globally available, CACZ 14-4-18
+
+const int any = MPI_ANY_SOURCE;
+const int undefined = MPI_UNDEFINED;
+
 
 template <class T>
 class msg_impl;
 
 class status;
+
+// added here, CACZ 14-4-18
+typedef std::shared_ptr<MPI_Status> mpi_status_ptr;
 
 template <class T>
 class request;

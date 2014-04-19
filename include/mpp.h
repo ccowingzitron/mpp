@@ -22,21 +22,20 @@
 
 #pragma once
 
-#include "detail/comm.h"
-#include "detail/endpoint.h"
-#include "detail/message.h"
-#include "detail/status.h"
-#include "detail/request.h"
+
+#include "mpp/comm.h"
+#include "mpp/endpoint.h"
+#include "mpp/message.h"
+#include "mpp/status.h"
+#include "mpp/request.h"
 
 #include <exception>
 
-namespace mpi {
+namespace mpp {
 
-const int any = MPI_ANY_SOURCE;
-
-/** 
- * Exception type used whenever the required thread level does not match 
- * the one provided by the underlying MPI library. 
+/**
+ * Exception type used whenever the required thread level does not match
+ * the one provided by the underlying MPI library.
  */
 struct ThreadLevelException : public std::exception {
 	const int required, provided;
@@ -49,24 +48,24 @@ struct ThreadLevelException : public std::exception {
 	}
 };
 
-enum thread_level { NO_THREAD, 
-					THREAD_SINGLE, 
+enum thread_level { NO_THREAD,
+					THREAD_SINGLE,
 					THREAD_FUNNELED,
-					THREAD_SERIALIZED, 
+					THREAD_SERIALIZED,
 					THREAD_MULTIPLE
 				  };
 
 inline void init(int argc = 0, char* argv[] = NULL, const thread_level required = NO_THREAD) {
-	if(required == NO_THREAD) { 
+	if(required == NO_THREAD) {
 		MPI_Init(&argc, &argv);
 		return;
 	}
-	
+
 	int provided;
 	// try initialize with the provided thread level
 	MPI_Init_thread(&argc, &argv, required, &provided);
 
-	if (provided < required) 
+	if (provided < required)
 		throw ThreadLevelException(required, provided);
 }
 

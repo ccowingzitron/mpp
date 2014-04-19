@@ -20,9 +20,9 @@
  *
  ******************************************************************************/
 
-#pragma once 
+#pragma once
 
-#include "detail/decls.h"
+#include "mpp/decls.h"
 
 #define OVERLOAD_SEND(name, impl) \
 	template <class MsgType> \
@@ -36,9 +36,9 @@
 	template <class RawType> \
 	inline endpoint& name(const RawType& m) { \
 		return name( std::move( msg_impl<const RawType>(m) ) ); \
-	} 
+	}
 
-namespace mpi {
+namespace mpp {
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // endpoint: represent the src or dest of an MPI channel. Provides streaming
@@ -53,7 +53,7 @@ class endpoint {
 
 	typedef int (*send_ptr)(void*,int,MPI_Datatype,int,int,MPI_Comm);
 
-	// Make this class non-copyable 
+	// Make this class non-copyable
 	endpoint(const endpoint& other) = delete;
 	endpoint& operator=(const endpoint& other) = delete;
 
@@ -62,42 +62,42 @@ public:
 		m_rank(rank), m_comm(com) { }
 
 	endpoint(endpoint&& other) :
-		m_rank(other.m_rank), 
+		m_rank(other.m_rank),
 		m_comm(std::move(other.m_comm)) { }
 
 	// Send a generic message to this endpoint (synchronously)
-	template <class MsgType> 
+	template <class MsgType>
 	inline endpoint& send_impl(const send_ptr& func, msg_impl<MsgType>&& m);
 
-	// MPI_Send wrappers 
+	// MPI_Send wrappers
 	OVERLOAD_SEND(send, MPI_Send)
 
-	// MPI_Ssend wrappers 
+	// MPI_Ssend wrappers
 	OVERLOAD_SEND(ssend, MPI_Ssend)
 
-	// MPI_Rsend wrappers 
+	// MPI_Rsend wrappers
 	OVERLOAD_SEND(rsend, MPI_Rsend)
 
 	// Send a generic message to this endpoint (asynchronously)
-	template <class MsgType> 
+	template <class MsgType>
 	inline request<MsgType> isend(msg_impl<MsgType>&& m);
 
 	// Send a generic message to this endpoint (asynchronously)
-	template <class MsgType> 
+	template <class MsgType>
 	inline request<MsgType> isend(const msg_impl<MsgType>& m) {
 		return isend(std::move(m));
 	}
 
 	// Send a generic message to this endpoint (asynchronously)
-	template <class RawMsg> 
+	template <class RawMsg>
 	inline request<const RawMsg> isend(const RawMsg& m) {
 		return isend( std::move( msg_impl<const RawMsg>(m) ) );
 	}
 
 
 	template <class MsgType>
-	inline endpoint& operator<<(msg_impl<MsgType>&& m) { 
-		return send(std::move(m)); 
+	inline endpoint& operator<<(msg_impl<MsgType>&& m) {
+		return send(std::move(m));
 	}
 
 	template <class MsgType>
@@ -132,22 +132,37 @@ public:
 
 	// Returns the rank of this endpoit
 	inline const int& rank() const { return m_rank; }
+
+	// added for use as MPI_Iprobe check for receive readiness, CACZ 14-4-18
+	template <class MsgType>
+	inline std::shared_ptr<status> probe(msg_impl<MsgType>&& m) {
+		mpi_status_ptr stat(new MPI_Status);
+		MPI_Iprobe(m.src(),m.tag(),m_comm.mpi_comm(),&(m.ready()),stat.get());
+		if (m.ready()) {
+			return std::shared_ptr<status>(new status(m_comm,std::move(stat),m.type()));
+		} else {
+			return std::shared_ptr<status>();
+		}
+	}
+
 };
 
-} // end mpi namespace 
+} // end mpi namespace
 
-#include "detail/comm.h"
+#include "mpp/comm.h"
 
-namespace mpi {
+namespace mpp {
 
-// Send a generic message to this endpoint (synchronously)
+// Send a generic message to this endpoint (synchronously) ; modified to record source and destination in message prior to sending by CACZ 14-4-18
 template <class MsgType>
 inline endpoint& endpoint::send_impl(const send_ptr& func, msg_impl<MsgType>&& m) {
+	m.src() = m_comm.rank();
+	m.dst() = this->rank();
 	MPI_Datatype&& dt = m.type();
-	if ( func(const_cast<void*>(static_cast<const void*>(m.addr())), 
+	if ( func(const_cast<void*>(static_cast<const void*>(m.addr())),
 			  static_cast<int>(m.size()), dt,
-			  m_rank, 
-			  m.tag(), 
+			  m_rank,
+			  m.tag(),
 			  m_comm.mpi_comm()
 			) == MPI_SUCCESS ) {
 		return *this;
@@ -159,18 +174,20 @@ inline endpoint& endpoint::send_impl(const send_ptr& func, msg_impl<MsgType>&& m
 	throw comm_error( ss.str() );
 }
 
-// Send a generic message to this endpoint (asynchronously)
+// Send a generic message to this endpoint (asynchronously) ; modified to record source and destination in message prior to sending by CACZ 14-4-18
 template <class MsgType>
 inline request<MsgType> endpoint::isend(msg_impl<MsgType>&& m) {
+	m.src() = m_comm.rank();
+	m.dst() = this->rank();
 	MPI_Datatype&& dt = m.type();
 	MPI_Request req;
-	if ( MPI_Isend( const_cast<void*>(static_cast<const void*>(m.addr())), 
+	if ( MPI_Isend( const_cast<void*>(static_cast<const void*>(m.addr())),
 			  		static_cast<int>(m.size()), dt,
-			  		m_rank, 
-			  		m.tag(), 
+			  		m_rank,
+			  		m.tag(),
 			  		m_comm.mpi_comm(),
 			  		&req
-				) != MPI_SUCCESS ) 
+				) != MPI_SUCCESS )
 	{
 		std::ostringstream ss;
 		ss << "ERROR in MPI rank '" << comm::world.rank()
@@ -182,16 +199,18 @@ inline request<MsgType> endpoint::isend(msg_impl<MsgType>&& m) {
 	return request<MsgType>(m_comm, req, std::move(m));
 }
 
-// Receive from this endpoing (asynchronously)
+// Receive from this endpoing (asynchronously) ; modified to record source and destination in message prior to receiving by CACZ 14-4-18
 template <class MsgType>
 inline request<MsgType> endpoint::operator>(msg_impl<MsgType>&& m) {
+	m.dst() = m_comm.rank();
+	m.src() = this->rank();
 	MPI_Request req;
-	if( MPI_Irecv( static_cast<void*>(m.addr()), 
-				   static_cast<int>(m.size()), 
+	if( MPI_Irecv( static_cast<void*>(m.addr()),
+				   static_cast<int>(m.size()),
 				   m.type(),
-				   m_rank, 
-				   m.tag(), 
-				   m_comm.mpi_comm(), 
+				   m_rank,
+				   m.tag(),
+				   m_comm.mpi_comm(),
 				   &req
 				 ) != MPI_SUCCESS ) {
 		std::ostringstream ss;
@@ -203,27 +222,30 @@ inline request<MsgType> endpoint::operator>(msg_impl<MsgType>&& m) {
 	return request<MsgType>(m_comm, req, std::move(m));
 }
 
-} // end mpi namespace 
+} // end mpi namespace
 
 
-#include "detail/status.h"
+#include "mpp/status.h"
 
-namespace mpi {
+namespace mpp {
 
 template <class RawType>
 inline status endpoint::operator>>(RawType& m) {
 	return operator>>( msg_impl<RawType>( m ) );
 }
 
+// modified to record source and destination in message prior to receiving by CACZ 14-4-18
 template <class MsgType>
 inline status endpoint::operator>>(msg_impl<MsgType>&& m) {
+	m.dst() = m_comm.rank();
+	m.src() = this->rank();
 	status::mpi_status_ptr stat( new MPI_Status );
 	MPI_Datatype dt = m.type();
-	if(MPI_Recv( const_cast<void*>(static_cast<const void*>(m.addr())), 
+	if(MPI_Recv( const_cast<void*>(static_cast<const void*>(m.addr())),
 				 static_cast<int>(m.size()), dt,
-				 m_rank, 
-				 m.tag(), 
-				 m_comm.mpi_comm(), 
+				 m_rank,
+				 m.tag(),
+				 m_comm.mpi_comm(),
 				 stat.get()
 			   ) == MPI_SUCCESS ) {
 		return status(m_comm, std::move(stat), dt);
@@ -235,4 +257,4 @@ inline status endpoint::operator>>(msg_impl<MsgType>&& m) {
 	throw comm_error( ss.str() );
 }
 
-} // end mpi namespace 
+} // end mpi namespace

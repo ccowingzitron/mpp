@@ -20,11 +20,11 @@
  *
  ******************************************************************************/
 
-#pragma once 
+#pragma once
 
-#include "detail/decls.h"
+#include "mpp/decls.h"
 
-namespace mpi {
+namespace mpp {
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // comm: is the abstraction of the MPI_Comm class
@@ -36,10 +36,11 @@ class comm {
 	int 	 m_comm_size;
 	int 	 m_rank;
 
-	comm(MPI_Comm comm): 
-		m_comm(comm), 
-		m_initialized(false), 
-		m_comm_size(-1), 
+public: // Constructor and check_init made public to facilitate splitting of communicators, by CACZ 14-4-16
+	comm(MPI_Comm comm):
+		m_comm(comm),
+		m_initialized(false),
+		m_comm_size(-1),
 		m_rank(-1) { }
 
 	// Check whether MPI_Init has been called
@@ -49,7 +50,7 @@ class comm {
 
 		int flag;
 		MPI_Initialized(&flag);
-		assert(flag != 0 && 
+		assert(flag != 0 &&
 			"FATAL: MPI environment not initialized (MPI_Init not called)");
 
 		m_initialized = true;
@@ -81,24 +82,40 @@ public:
 		return m_comm_size;
 	}
 
-	const MPI_Comm& mpi_comm() const { 
+	const MPI_Comm& mpi_comm() const {
 		return m_comm;
 	}
 
-	inline endpoint operator()( const int& rank_id ) const; 
+	inline endpoint operator()( const int& rank_id ) const;
+
+// method split added to implement MPI_Comm_split, by CACZ 14-4-16
+	inline comm split( const int& color, const int&key ) const {
+
+		MPI_Comm m_split_comm;
+		assert( MPI_Comm_split(m_comm,color,key,&m_split_comm) == MPI_SUCCESS );
+		comm m_split(m_split_comm);
+		m_split.check_init();
+		return m_split;
+
+	}
+
+// method barrier added to implement MPI_Comm_split, by CACZ 14-4-16
+	inline void barrier() const {
+		MPI_Barrier(m_comm);
+	}
 
 };
 
 comm comm::world = comm(MPI_COMM_WORLD);
 
-} // end mpi namespace 
+} // end mpi namespace
 
-#include "detail/endpoint.h"
+#include "mpp/endpoint.h"
 
-namespace mpi {
+namespace mpp {
 
 inline endpoint comm::operator()(const int& rank_id) const {
 	return endpoint(rank_id, *this);
 }
 
-} // end mpi namespace 
+} // end mpi namespace
