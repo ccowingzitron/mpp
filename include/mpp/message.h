@@ -83,7 +83,7 @@ struct msg_impl {
 
 private:
 
-	// Make this class non-copyable, CACZ 14-4-18
+	// Make this class non-copyable
 	msg_impl(const msg_impl<value_type>& other) = delete;
 	msg_impl<value_type> operator=(const msg_impl<value_type>& other) = delete;
 
