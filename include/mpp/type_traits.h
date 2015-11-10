@@ -162,7 +162,7 @@ struct mpi_type_traits<std::list<T>> {
 		std::vector<MPI_Datatype>::iterator type_it = types.begin();
 
 		MPI_Aint base_address;
-		MPI_Address(const_cast<T*>(&l.front()), &base_address);
+		MPI_Get_Address(const_cast<T*>(&l.front()), &base_address);
 
 		*(type_it++) = mpi_type_traits<T>::get_type( l.front() );
 		*(dim_it++) = static_cast<int>(mpi_type_traits<T>::get_size( l.front() ));
@@ -175,7 +175,7 @@ struct mpi_type_traits<std::list<T>> {
 						  type_it != types.end() &&
 						  dim_it != dimension.end() );
 
-				MPI_Address(const_cast<T*>(&curr), &*address_it);
+				MPI_Get_Address(const_cast<T*>(&curr), &*address_it);
 				*(address_it++) -= base_address;
 				*(type_it++) =  mpi_type_traits<T>::get_type( curr );
 				*(dim_it++) = static_cast<int>(mpi_type_traits<T>::get_size( curr ));

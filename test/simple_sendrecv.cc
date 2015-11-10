@@ -5,7 +5,7 @@
 #include <cmath>
 #include <chrono>
 
-using namespace mpi;
+using namespace mpp;
 
 TEST(SendRecv, Scalar) {
 	if(comm::world.rank() == 0) {
@@ -91,7 +91,7 @@ TEST(SendRecv, Array) {
  	}
  
  	while ( p <= 10 ) {
- 		auto ep = (comm::world(mpi::any) >> p ).source();
+ 		auto ep = (comm::world(mpp::any) >> p ).source();
  		ep << p+1;
  		EXPECT_TRUE(comm::world.rank()==0?p%2!=0:p%2==0);
  	}
@@ -154,7 +154,7 @@ TEST(Performance, MpiScalar) {
 
 TEST(Performance, MppScalar) {
 
-	using mpi::comm;
+	using mpp::comm;
 	auto& world = comm::world;
 
 	auto bench = [&]() {

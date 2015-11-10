@@ -3,7 +3,7 @@
 #include <mpp.h>
 #include <iostream>
 
-using namespace mpi;
+using namespace mpp;
 
 TEST(Type, Char) {
 	if(comm::world.rank() == 0) {

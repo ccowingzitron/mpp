@@ -51,7 +51,7 @@ class endpoint {
 	const comm& 	m_comm;  // The MPI communicator this endpoing
 							 // belongs to
 
-	typedef int (*send_ptr)(void*,int,MPI_Datatype,int,int,MPI_Comm);
+	typedef int (*send_ptr)(void const*,int,MPI_Datatype,int,int,MPI_Comm);
 
 	// Make this class non-copyable
 	endpoint(const endpoint& other) = delete;
